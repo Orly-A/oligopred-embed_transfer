@@ -18,22 +18,28 @@ from sklearn import metrics
 
 
 PATH = "/vol/ek/Home/orlyl02/working_dir/oligopred/embed_transfer/"
-cov_PATH = "/vol/ek/Home/orlyl02/working_dir/oligopred/embed_transfer/transfer_cov03/"
+# for use with esm embeddings
+cov_PATH = "/vol/ek/Home/orlyl02/working_dir/oligopred/embed_transfer/esm_embeds/"
+
+# cov_PATH = "/vol/ek/Home/orlyl02/working_dir/oligopred/embed_transfer/transfer_cov03/"
 SAVE_PATH = cov_PATH
 NUM_CV = 5
 
 
 def get_data():
-    overall_train_set = pd.read_pickle(cov_PATH + "train_set_c0.3.pkl")
+    # overall_train_set = pd.read_pickle(cov_PATH + "train_set_c0.3.pkl")
+    #for esm embeddings
+    overall_train_set = pd.read_pickle("/vol/ek/Home/orlyl02/working_dir/oligopred/esmfold_prediction/train_set_c0.3.pkl")
+
     overall_train_set.reset_index(drop=True, inplace=True)
-    train_set = pd.read_pickle(PATH + "train_set_c03_8020_train2.pkl")
-    test_set = pd.read_pickle(PATH + "test_set_c03_8020_test2.pkl")
+    train_set = pd.read_pickle(PATH + "train_set_c03_8020_train2_esm.pkl")
+    test_set = pd.read_pickle(PATH + "test_set_c03_8020_test2_esm.pkl")
     return overall_train_set, train_set, test_set
 
 
 def get_matrices():
     alnRes_mat = pd.read_pickle(PATH + "alnRes_blast1_mat.pkl")
-    cosine_sim_df = pd.read_pickle(cov_PATH + "cosine_sim_df_c0.3.pkl")
+    cosine_sim_df = pd.read_pickle(cov_PATH + "cosine_sim_df_c0.3_esm.pkl")
     pdbs_not_in_blast = [x for x in cosine_sim_df.index.to_list() if x not in alnRes_mat.index.to_list()]
     pdbs_in_holdout = [x for x in alnRes_mat.index.to_list() if x not in overall_train_set.code.to_list()]
     pdbs_to_remove = pdbs_not_in_blast + pdbs_in_holdout
@@ -81,7 +87,7 @@ def calc_model_params(final_pred):
     # seq_majority_f1_score = round(f1_score(y_test, alnRes_pred_df.alnRes_majority_top10, average='weighted'), 3)
     # seq_majority_bal_acc = round(metrics.balanced_accuracy_score(y_test, alnRes_pred_df.alnRes_majority_top10, adjusted=True), 3)
 
-    with open(SAVE_PATH + "score_results_no_clust.csv", 'w') as f:
+    with open(SAVE_PATH + "score_results_no_clust_esm.csv", 'w') as f:
         f.write("Cosine_F1_score: " + str(cosine_f1_score) + "\n")
         f.write("Cosine_balanced_accuracy: " + str(cosine_bal_acc) + "\n")
         # f.write("Cosine_majority_F1_score: " + str(cosine_majority_f1_score) + "\n")
@@ -155,7 +161,7 @@ if __name__ == "__main__":
     overall_with_seq_pred = get_label_score_loop_seq(filtered_overall_train_set, alnRes_mat)
     final_pred = get_label_score_loop_cos(overall_with_seq_pred, cosine_sim_df)
     y_test = calc_model_params(final_pred)
-    final_pred.to_pickle(SAVE_PATH + "final_pred_no_clust.pkl")
+    final_pred.to_pickle(SAVE_PATH + "final_pred_no_clust_esm.pkl")
     # final_pred = pd.read_pickle(SAVE_PATH + "final_pred_no_clust.pkl")
 
     print(final_pred)

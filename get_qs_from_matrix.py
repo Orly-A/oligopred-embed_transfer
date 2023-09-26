@@ -19,14 +19,16 @@ from sklearn import metrics
 from io import StringIO
 
 PATH = "/vol/ek/Home/orlyl02/working_dir/oligopred/embed_transfer/"
-cov_PATH = "/vol/ek/Home/orlyl02/working_dir/oligopred/embed_transfer/transfer_cov03/"
+# for use with esm embeddings
+cov_PATH = "/vol/ek/Home/orlyl02/working_dir/oligopred/embed_transfer/esm_embeds/"
 SAVE_PATH = cov_PATH
 NUM_CV = 5
 
 
 def data_definition():
     # with open(PATH + "train_set.pkl", 'rb') as f:
-    with open(cov_PATH + "train_set_c0.3.pkl", 'rb') as f:
+    with open("/vol/ek/Home/orlyl02/working_dir/oligopred/esmfold_prediction/train_set_c0.3.pkl", 'rb') as f:
+    # with open(cov_PATH + "train_set_c0.3.pkl", 'rb') as f:
         overall_train_set = pickle.load(f)
     # index reset is important for the stratified splitting and the saving to lists
     overall_train_set.reset_index(drop=True, inplace=True)
@@ -53,8 +55,8 @@ def data_definition():
     # using set number 2 since the sizes of the folds are very different and test_0 has only 38 pdbs...
     train_set = overall_train_set[overall_train_set["code"].isin(merged_train_test["train_2"])]
     test_set = overall_train_set[overall_train_set["code"].isin(merged_train_test["test_2"])]
-    train_set.to_pickle(PATH + "train_set_c03_8020_train2.pkl")
-    test_set.to_pickle(PATH + "test_set_c03_8020_test2.pkl")
+    train_set.to_pickle(PATH + "train_set_c03_8020_train2_esm.pkl")
+    test_set.to_pickle(PATH + "test_set_c03_8020_test2_esm.pkl")
 
     # Differently from the original code, I'm using 'code' and not 'embeddings' as X
     train_set = train_set[["code", "nsub"]]
@@ -154,7 +156,7 @@ def calc_model_params(cosine_pred_df, alnRes_pred_df, test_set):
     seq_majority_f1_score = round(f1_score(y_test, alnRes_pred_df.alnRes_majority_top10, average='weighted'), 3)
     seq_majority_bal_acc = round(metrics.balanced_accuracy_score(y_test, alnRes_pred_df.alnRes_majority_top10, adjusted=True), 3)
 
-    with open(SAVE_PATH + "score_results_blast1.csv", 'w') as f:
+    with open(SAVE_PATH + "score_results_esm.csv", 'w') as f:
         f.write("Cosine_F1_score: " + str(cosine_f1_score) + "\n")
         f.write("Cosine_balanced_accuracy: " + str(cosine_bal_acc) + "\n")
         f.write("Cosine_majority_F1_score: " + str(cosine_majority_f1_score) + "\n")
@@ -172,7 +174,7 @@ def calc_model_params(cosine_pred_df, alnRes_pred_df, test_set):
 if __name__ == "__main__":
     alnRes_mat = pd.read_pickle(PATH + "alnRes_blast_e100_mat.pkl")
     # cosine_sim_df = pd.read_pickle(PATH + "cosine_sim_df.pkl")
-    cosine_sim_df = pd.read_pickle(cov_PATH + "cosine_sim_df_c0.3.pkl")
+    cosine_sim_df = pd.read_pickle(cov_PATH + "cosine_sim_df_c0.3_esm.pkl")
     train_set, X_train, y_train, test_set, X_test, y_test, list_of_pdbs_to_remove = data_definition()
     pdbs_not_in_train = [x for x in alnRes_mat.columns.to_list() if x not in train_set.code.to_list()]
     # to be honest I am not sure why excatly we are missing these, I suspect they dont have any blast hits but haven't completely verified
@@ -180,13 +182,21 @@ if __name__ == "__main__":
     list_for_cosine = list(set(list_of_pdbs_to_remove + pdbs_not_in_blast))
     list_for_seq = list(set(pdbs_not_in_train + pdbs_not_in_blast))
     cosine_pred_df = get_qs_from_embed(test_set, cosine_sim_df, list_for_cosine, pdbs_not_in_blast)
-    alnRes_pred_df = get_qs_from_seq(test_set, alnRes_mat, list_for_seq, pdbs_not_in_blast)
+    # alnRes_pred_df = get_qs_from_seq(test_set, alnRes_mat, list_for_seq, pdbs_not_in_blast)
     # cosine_pred_df.to_pickle(PATH + "cosine_pred_df_2.pkl")
     # alnRes_pred_df.to_pickle(PATH + "alnRes_pred_df_2.pkl")
 
-    cosine_pred_df.to_pickle(SAVE_PATH + "cosine_pred_df_c03.pkl")
-    alnRes_pred_df.to_pickle(SAVE_PATH + "alnRes_blast_e100__pred_df_c03.pkl")
+    cosine_pred_df.to_pickle(SAVE_PATH + "cosine_pred_df_c03_esm.pkl")
+    # alnRes_pred_df.to_pickle(SAVE_PATH + "alnRes_blast_e100_pred_df_c03.pkl")
+    # dont need to run this again, loaded the saved files
 
+    alnRes_pred_df = pd.read_pickle("/vol/ek/Home/orlyl02/working_dir/oligopred/embed_transfer/transfer_cov03/alnRes_blast1_pred_df_c03.pkl")
+    lst_not_in_cos = [x for x in y_test.index.to_list() if x not in cosine_pred_df.index.to_list()]
+    lst_not_in_aln = [x for x in y_test.index.to_list() if x not in alnRes_pred_df.index.to_list()]
+    y_test.drop(lst_not_in_cos, inplace=True, errors='ignore')
+    y_test.drop(lst_not_in_aln, inplace=True, errors='ignore')
+    cosine_pred_df.drop(lst_not_in_aln, inplace=True, errors='ignore')
+    alnRes_pred_df.drop(lst_not_in_cos, inplace=True, errors='ignore')
     y_test = calc_model_params(cosine_pred_df, alnRes_pred_df, test_set)
     print("Cosine_F1_score: " + str(round(f1_score(y_test, cosine_pred_df.cosine_pred, average="weighted"), 3)))
     print("Seq_F1_score: " + str(round(f1_score(y_test, alnRes_pred_df.alnRes_pred, average='weighted'), 3)))
